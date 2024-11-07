@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -44,15 +42,12 @@ func main() {
 	flag.IntVar(&settings.port, "port", 4000, "server port")
 	flag.StringVar(&settings.environment, "env", "development", "Environment?(development|staging|production)")
 	flag.StringVar(&settings.db.dsn, "db-dsn", "postgres://products:fishsticks@localhost/products", "PostgresSQL DSN")
-	//read in the dsn
-	flag.Float64Var(&settings.limiter.rps, "limiter-rps", 2,
-	"Rate Limiter maximum requests per second")
 
-	flag.IntVar(&settings.limiter.burst, "limiter-burst", 5,
-	"Rate Limiter maximum burst")
+	flag.Float64Var(&settings.limiter.rps, "limiter-rps", 2,"Rate Limiter maximum requests per second")
 
-	flag.BoolVar(&settings.limiter.enabled, "limiter-enabled", true,
-	"Enable rate limiter")
+	flag.IntVar(&settings.limiter.burst, "limiter-burst", 5, "Rate Limiter maximum burst")
+
+	flag.BoolVar(&settings.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
 	flag.Parse()
 
@@ -72,14 +67,13 @@ func main() {
 		productModel: data.ProductModel{DB: db},
 		reviewModel:  data.ReviewModel{DB: db},
 	}
-
 	err = appInstance.serve()
     if err != nil {
         logger.Error(err.Error())
         os.Exit(1)
     }
-
 }
+
 
 func openDB(settings serverConfig) (*sql.DB, error) {
 	db, err := sql.Open("postgres", settings.db.dsn)
