@@ -22,6 +22,13 @@ type serverConfig struct {
 	db          struct {
 		dsn string
 	}
+
+	limiter struct {
+        rps float64                      // requests per second
+        burst int                        // initial requests possible
+        enabled bool                     // enable or disable rate limiter
+    }
+
 }
 
 type applicationDependencies struct {
@@ -37,6 +44,16 @@ func main() {
 	flag.IntVar(&settings.port, "port", 4000, "server port")
 	flag.StringVar(&settings.environment, "env", "development", "Environment?(development|staging|production)")
 	flag.StringVar(&settings.db.dsn, "db-dsn", "postgres://products:fishsticks@localhost/products", "PostgresSQL DSN")
+	//read in the dsn
+	flag.Float64Var(&settings.limiter.rps, "limiter-rps", 2,
+	"Rate Limiter maximum requests per second")
+
+	flag.IntVar(&settings.limiter.burst, "limiter-burst", 5,
+	"Rate Limiter maximum burst")
+
+	flag.BoolVar(&settings.limiter.enabled, "limiter-enabled", true,
+	"Enable rate limiter")
+
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -55,18 +72,13 @@ func main() {
 		productModel: data.ProductModel{DB: db},
 		reviewModel:  data.ReviewModel{DB: db},
 	}
-	apiServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", settings.port),
-		Handler:      appInstance.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
-	}
-	logger.Info("starting server", "address", apiServer.Addr, "environment", settings.environment)
-	err = apiServer.ListenAndServe()
-	logger.Error(err.Error())
-	os.Exit(1)
+
+	err = appInstance.serve()
+    if err != nil {
+        logger.Error(err.Error())
+        os.Exit(1)
+    }
+
 }
 
 func openDB(settings serverConfig) (*sql.DB, error) {

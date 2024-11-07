@@ -13,11 +13,12 @@ import (
 func (a *applicationDependencies) createProductHandler(w http.ResponseWriter, r *http.Request) {
 	// Define a struct to hold the input data from the request body
 	var input struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Category    string  `json:"category"`
-		Price       float64 `json:"price"`
-		ImageURL    string  `json:"image_url"`
+		Name          string  `json:"name"`
+		Description   string  `json:"description"`
+		Category      string  `json:"category"`
+		Price         float64 `json:"price"`
+		ImageURL      string  `json:"image_url"`
+		AverageRating float64 `json:"average_rating,omitempty"` // Optional field for initial rating
 	}
 
 	// Read and decode the JSON body into the input struct
@@ -29,11 +30,12 @@ func (a *applicationDependencies) createProductHandler(w http.ResponseWriter, r 
 
 	// Create a new Product struct with the input data
 	product := &data.Product{
-		Name:        input.Name,
-		Description: input.Description,
-		Category:    input.Category,
-		Price:       input.Price,
-		ImageURL:    input.ImageURL,
+		Name:          input.Name,
+		Description:   input.Description,
+		Category:      input.Category,
+		Price:         input.Price,
+		ImageURL:      input.ImageURL,
+		AverageRating: input.AverageRating, // Initialize with the provided rating
 	}
 
 	// Initialize a validator and validate the product data
@@ -113,11 +115,12 @@ func (a *applicationDependencies) updateProductHandler(w http.ResponseWriter, r 
 
 	// Define a struct to hold optional fields for partial updates
 	var input struct {
-		Name        *string  `json:"name"`
-		Description *string  `json:"description"`
-		Category    *string  `json:"category"`
-		Price       *float64 `json:"price"`
-		ImageURL    *string  `json:"image_url"`
+		Name          *string  `json:"name"`
+		Description   *string  `json:"description"`
+		Category      *string  `json:"category"`
+		Price         *float64 `json:"price"`
+		ImageURL      *string  `json:"image_url"`
+		AverageRating *float64 `json:"average_rating,omitempty"` // Optional field to update the rating
 	}
 	err = a.readJSON(w, r, &input)
 	if err != nil {
@@ -140,6 +143,9 @@ func (a *applicationDependencies) updateProductHandler(w http.ResponseWriter, r 
 	}
 	if input.ImageURL != nil {
 		product.ImageURL = *input.ImageURL
+	}
+	if input.AverageRating != nil {
+		product.AverageRating = *input.AverageRating
 	}
 
 	// Validate the updated product data
@@ -213,7 +219,7 @@ func (a *applicationDependencies) listProductsHandler(w http.ResponseWriter, r *
 	input.Filters.Page = a.getSingleIntegerParameter(queryParameters, "page", 1, v)
 	input.Filters.PageSize = a.getSingleIntegerParameter(queryParameters, "page_size", 10, v)
 	input.Filters.Sort = a.getSingleQueryParameter(queryParameters, "sort", "id")
-	input.Filters.SortSafeList = []string{"id", "name", "-id", "-name", "price", "-price"}
+	input.Filters.SortSafeList = []string{"id", "name", "-id", "-name", "price", "-price", "average_rating", "-average_rating"}
 
 	// Validate filters and handle errors if necessary
 	data.ValidateFilters(v, input.Filters)

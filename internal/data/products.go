@@ -14,14 +14,15 @@ var ErrRecordNotFound = errors.New("record not found")
 
 // Product struct represents a product with various attributes.
 type Product struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Category    string    `json:"category"`
-	Price       float64   `json:"price"`
-	ImageURL    string    `json:"image_url"`
-	CreatedAt   time.Time `json:"-"`
-	Version     int32     `json:"version"`
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	Category      string    `json:"category"`
+	Price         float64   `json:"price"`
+	ImageURL      string    `json:"image_url"`
+	AverageRating float64   `json:"average_rating"`
+	CreatedAt     time.Time `json:"-"`
+	Version       int32     `json:"version"`
 }
 
 // ProductModel struct wraps the DB connection pool.
@@ -38,16 +39,17 @@ func ValidateProduct(v *validator.Validator, product *Product) {
 	v.Check(product.Category != "", "category", "must be provided")
 	v.Check(product.Price > 0, "price", "must be a positive number")
 	v.Check(len(product.ImageURL) <= 255, "image_url", "must not be more than 255 characters long")
+	v.Check(product.AverageRating >= 0 && product.AverageRating <= 5, "average_rating", "must be between 0 and 5")
 }
 
 // Insert inserts a new product into the database and returns the created product ID, creation time, and version.
 func (p ProductModel) Insert(product *Product) error {
 	query := `
-		INSERT INTO products (name, description, category, price, image_url)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO products (name, description, category, price, image_url, average_rating)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, version
 	`
-	args := []any{product.Name, product.Description, product.Category, product.Price, product.ImageURL}
+	args := []any{product.Name, product.Description, product.Category, product.Price, product.ImageURL, product.AverageRating}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -61,7 +63,7 @@ func (p ProductModel) Get(id int64) (*Product, error) {
 	}
 
 	query := `
-		SELECT id, created_at, name, description, category, price, image_url, version
+		SELECT id, created_at, name, description, category, price, image_url, average_rating, version
 		FROM products
 		WHERE id = $1
 	`
@@ -78,6 +80,7 @@ func (p ProductModel) Get(id int64) (*Product, error) {
 		&product.Category,
 		&product.Price,
 		&product.ImageURL,
+		&product.AverageRating,
 		&product.Version,
 	)
 	if err != nil {
@@ -93,11 +96,11 @@ func (p ProductModel) Get(id int64) (*Product, error) {
 func (p ProductModel) Update(product *Product) error {
 	query := `
 		UPDATE products
-		SET name = $1, description = $2, category = $3, price = $4, image_url = $5, version = version + 1
-		WHERE id = $6
+		SET name = $1, description = $2, category = $3, price = $4, image_url = $5, average_rating = $6, version = version + 1
+		WHERE id = $7
 		RETURNING version
 	`
-	args := []any{product.Name, product.Description, product.Category, product.Price, product.ImageURL, product.ID}
+	args := []any{product.Name, product.Description, product.Category, product.Price, product.ImageURL, product.AverageRating, product.ID}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -136,7 +139,7 @@ func (p ProductModel) Delete(id int64) error {
 // GetAll retrieves all products, with filtering, sorting, and pagination.
 func (p ProductModel) GetAll(name, category string, filters Filters) ([]*Product, Metadata, error) {
 	query := fmt.Sprintf(`
-		SELECT COUNT(*) OVER(), id, created_at, name, description, category, price, image_url, version
+		SELECT COUNT(*) OVER(), id, created_at, name, description, category, price, image_url, average_rating, version
 		FROM products
 		WHERE (to_tsvector('simple', name) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (category = $2 OR $2 = '')
@@ -166,6 +169,7 @@ func (p ProductModel) GetAll(name, category string, filters Filters) ([]*Product
 			&product.Category,
 			&product.Price,
 			&product.ImageURL,
+			&product.AverageRating,
 			&product.Version,
 		)
 		if err != nil {
